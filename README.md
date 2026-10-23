@@ -1,15 +1,49 @@
-# iOS Keyboard Layout Studio & APK Build (GitHub Actions)
+# iOS Keyboard Studio (ReactorKit + KeyboardLayoutEngine) & APK Build
 
-A professional iOS Keyboard Simulator and dynamic Layout Engine based on Cem Olcay's [`KeyboardLayoutEngine`](https://github.com/cemolcay/KeyboardLayoutEngine) architecture, with full bilingual support (Arabic & English), Web Audio mechanical key clicks, Swift code generator, and an automated GitHub Actions CI/CD workflow to compile and export Android APKs.
+A professional iOS Keyboard Simulator and dynamic Layout Engine combining:
+1. **[ReactorKit](https://github.com/ReactorKit/ReactorKit)**: Suyeol Jeon's famous unidirectional reactive Swift architecture (`Action` &rarr; `mutate()` &rarr; `Mutation` &rarr; `reduce()` &rarr; `State` &rarr; `View`).
+2. **[KeyboardLayoutEngine](https://github.com/cemolcay/KeyboardLayoutEngine)**: Cem Olcay's dynamic iOS keyboard row layout engine with `.Dynamic`, `.Static`, and `.Relative` button widths.
+3. **Automated Android APK CI/CD**: Pre-configured GitHub Actions workflow compiling native debug APKs (`app-debug.apk`) via Gradle with Java 21 & Android SDK 35.
+
+---
+
+## ⚡ Architecture: ReactorKit + KeyboardLayoutEngine
+
+```
+[ User Interaction / Key Press ]
+               │
+               ▼
+   View (UIInputViewController)
+               │  reactor.action.onNext(.insertText("A"))
+               ▼
+             Action
+               │
+               ▼
+     Reactor.mutate(action:) ────> Network / TextProxy
+               │
+               ▼
+            Mutation (.setText, .setShiftState)
+               │
+               ▼
+ Reactor.reduce(state:mutation:)
+               │
+               ▼
+         New State (Immutable)
+               │
+               ▼
+   View.bind(reactor:) (DistinctUntilChanged)
+```
 
 ---
 
 ## 📱 Features
 
-- **Cem Olcay KeyboardLayoutEngine Architecture**:
+- **ReactorKit Unidirectional Architecture**:
+  - Live Reactor stream visualizer in the UI showing `Action` &rarr; `Mutation` &rarr; `State`.
+  - Immutable state updates for cursor position, text, mode, shift, and language.
+- **Cem Olcay KeyboardLayoutEngine**:
   - `KeyboardLayout`, `KeyboardRow`, `KeyboardButton`
-  - Dynamic width calculation: `.Dynamic`, `.Static(points)`, `.Relative(percent)`
-  - Key types: `.Key(String)`, `.Text(String)`, `.Image(UIImage)`
+  - `.Dynamic`, `.Static(points)`, and `.Relative(percent)` key widths.
 - **iOS Physics & Experience**:
   - Key Magnifier Popover Bubble on touch down
   - Long-press accents & diacritics flyout (Latin accents & Arabic Tashkeel/Hamza)
@@ -18,10 +52,10 @@ A professional iOS Keyboard Simulator and dynamic Layout Engine based on Cem Olc
   - QuickType predictive suggestions bar
   - Native iOS Emoji drawer with categories and search
 - **Swift Code Generator**:
-  - 100% compatible Swift export for Xcode `UIInputViewController` custom keyboard extensions
+  - Generates both `KeyboardViewReactor.swift` (ReactorKit) and `CustomKeyboardLayout.swift` (KeyboardLayoutEngine) ready for Xcode.
 - **Automated GitHub Actions APK Build**:
-  - Pre-configured `.github/workflows/build-apk.yml`
-  - Automated compilation to Android APK (`app-debug.apk`) upon push
+  - Workflow at `.github/workflows/build-apk.yml`
+  - Java JDK 21, Android SDK 35, license acceptance, Gradle assembleDebug, and APK artifact upload.
 
 ---
 
@@ -29,44 +63,12 @@ A professional iOS Keyboard Simulator and dynamic Layout Engine based on Cem Olc
 
 1. **Push this project to your GitHub repository**:
    ```bash
-   git init
    git add .
-   git commit -m "feat: iOS Keyboard Studio with GitHub APK Workflow"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-   git push -u origin main
+   git commit -m "feat: iOS Keyboard Studio with ReactorKit and GitHub APK CI"
+   git push origin main
    ```
 
-2. **Automated Cloud Build**:
+2. **Download APK**:
    - Go to your repository on GitHub and click on the **Actions** tab.
-   - The workflow **"Build Android APK"** will execute automatically.
-   - Once completed (~2 minutes), download the artifact **`iOS-Keyboard-Studio-APK`** containing your `app-debug.apk`!
-
----
-
-## 📂 Project Structure
-
-```
-├── .github/workflows/
-│   └── build-apk.yml             # GitHub Actions automated APK compilation
-├── capacitor.config.json         # Android Capacitor configuration
-├── src/
-│   ├── audio/
-│   │   └── iosSoundEngine.ts     # Web Audio API key clicks synthesizer
-│   ├── components/
-│   │   ├── BuildApkModal.tsx     # APK & GitHub Actions inspector modal
-│   │   ├── EmojiKeyboardView.tsx # iOS Emoji keyboard drawer
-│   │   ├── IPhoneDeviceFrame.tsx # iPhone 16 Pro mockup frame
-│   │   ├── KeyButtonView.tsx     # 3D iOS keycap with bubble & accents
-│   │   ├── KeyboardLayoutView.tsx# Keyboard container & QuickType bar
-│   │   ├── KeyboardRowView.tsx   # Dynamic/Static/Relative row layout
-│   │   ├── LayoutEditorModal.tsx # Custom layout architect & row editor
-│   │   └── SwiftCodeModal.tsx    # Swift code exporter modal
-│   ├── layouts/
-│   │   └── presets.ts            # English, Arabic, Numbers & Symbols presets
-│   ├── types/
-│   │   └── keyboard.ts           # Cem Olcay LayoutEngine TypeScript models
-│   └── utils/
-│       └── swiftExporter.ts      # Swift code generation for Xcode
-└── package.json
-```
+   - Click the workflow run **"Build Android APK"**.
+   - Download the artifact **`iOS-Keyboard-Studio-APK`**.

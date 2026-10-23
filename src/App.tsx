@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IPhoneDeviceFrame } from './components/IPhoneDeviceFrame';
 import { SwiftCodeModal } from './components/SwiftCodeModal';
 import { LayoutEditorModal } from './components/LayoutEditorModal';
 import { BuildApkModal } from './components/BuildApkModal';
+import { ReactorKitInspector } from './components/ReactorKitInspector';
+import { keyboardReactor, KeyboardState } from './reactor/keyboardReactor';
 import { KeyboardLayoutData } from './types/keyboard';
 import { 
   createEnglishLayout, 
@@ -34,96 +36,76 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [text, setText] = useState('Welcome to iOS Keyboard Layout Engine. اضغط على أي زر لتجربة لوحة المفاتيح.');
-  const [cursorPosition, setCursorPosition] = useState(text.length);
-  const [isDark, setIsDark] = useState(false);
+  const [reactorState, setReactorState] = useState<KeyboardState>(keyboardReactor.getState());
   const [isArabicUI, setIsArabicUI] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<'en' | 'ar' | 'numbers' | 'symbols' | 'custom'>('en');
-  const [customLayout, setCustomLayout] = useState<KeyboardLayoutData | null>(null);
-  const [viewMode, setViewMode] = useState<'iphone' | 'workbench'>('iphone');
+
+  useEffect(() => {
+    return keyboardReactor.subscribe((newState) => {
+      setReactorState({ ...newState });
+    });
+  }, []);
 
   // Modals
   const [isSwiftModalOpen, setIsSwiftModalOpen] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
-  const [soundVolume, setSoundVolume] = useState(0.65);
-  const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Manage text editing
+  // Manage text editing via Reactor Actions
   const handleInsertText = (inserted: string) => {
-    const next = text.slice(0, cursorPosition) + inserted + text.slice(cursorPosition);
-    setText(next);
-    setCursorPosition(cursorPosition + inserted.length);
+    keyboardReactor.action({ type: 'insertText', text: inserted });
   };
 
   const handleBackspace = () => {
-    if (cursorPosition === 0) return;
-    const next = text.slice(0, cursorPosition - 1) + text.slice(cursorPosition);
-    setText(next);
-    setCursorPosition(cursorPosition - 1);
+    keyboardReactor.action({ type: 'deleteBackward' });
   };
 
   const handleReturn = () => {
-    handleInsertText('\n');
+    keyboardReactor.action({ type: 'insertText', text: '\n' });
   };
 
   const handleMoveCursor = (delta: number) => {
-    setCursorPosition((prev) => Math.max(0, Math.min(text.length, prev + delta)));
+    keyboardReactor.action({ type: 'moveCursor', delta });
   };
 
   const handleClearText = () => {
-    setText('');
-    setCursorPosition(0);
+    keyboardReactor.action({ type: 'clearText' });
   };
 
   const handleInsertSampleText = () => {
     const sample = isArabicUI 
-      ? 'لوحة مفاتيح iOS احترافية تدعم الكتابة باللغة العربية والإنجليزية، وتخطيط الصفوف الديناميكي حسب مكتبة KeyboardLayoutEngine.'
-      : 'Experience high-fidelity iOS keyboard physics, haptic clicks, accent popovers, and Swift code generation based on cemolcay/KeyboardLayoutEngine.';
-    setText(sample);
-    setCursorPosition(sample.length);
+      ? 'لوحة مفاتيح iOS احترافية مبنية بهيكلية ReactorKit الأحادية وتخطيط KeyboardLayoutEngine الديناميكي.'
+      : 'Experience high-fidelity iOS keyboard physics, reactive ReactorKit unidirectional flow, and Swift code generation.';
+    keyboardReactor.action({ type: 'loadSampleText', text: sample });
   };
 
-  // Get current active layout data for inspector & Swift export
-  const getCurrentLayoutData = (): KeyboardLayoutData => {
-    if (customLayout) return customLayout;
-    if (selectedPreset === 'ar') return createArabicLayout(isDark ? 'dark' : 'light');
-    if (selectedPreset === 'numbers') return createNumbersLayout(isDark ? 'dark' : 'light');
-    if (selectedPreset === 'symbols') return createSymbolsLayout(isDark ? 'dark' : 'light');
-    return createEnglishLayout(isDark ? 'dark' : 'light');
-  };
-
-  const activeLayoutData = getCurrentLayoutData();
+  const activeLayoutData = keyboardReactor.getActiveLayout();
 
   const handleVolumeChange = (vol: number) => {
-    setSoundVolume(vol);
-    soundEngine.volume = vol;
-    if (vol > 0 && !soundEnabled) {
-      setSoundEnabled(true);
-      soundEngine.enabled = true;
-    }
+    keyboardReactor.action({ type: 'setVolume', volume: vol });
   };
 
   const toggleSound = () => {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    soundEngine.enabled = next;
+    keyboardReactor.action({ type: 'toggleSound' });
   };
 
-  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const toggleTheme = () => {
+    keyboardReactor.action({ type: 'toggleTheme' });
+  };
+
+  const wordCount = reactorState.text.trim() ? reactorState.text.trim().split(/\s+/).length : 0;
   const totalKeys = activeLayoutData.rows.reduce((acc, row) => acc + row.items.length, 0);
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} flex flex-col font-sans transition-colors duration-200`}>
+    <div className={`min-h-screen ${reactorState.isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} flex flex-col font-sans transition-colors duration-200`}>
       {/* Top Bar following Top Bar Contract: 3 zones, 1 row */}
-      <header className={`h-16 px-6 border-b flex items-center justify-between gap-8 shrink-0 ${isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'} backdrop-blur-md sticky top-0 z-40`}>
+      <header className={`h-16 px-6 border-b flex items-center justify-between gap-8 shrink-0 ${reactorState.isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-slate-200'} backdrop-blur-md sticky top-0 z-40`}>
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
             <Keyboard className="w-4 h-4" />
           </div>
           <span className="text-base font-bold tracking-tight whitespace-nowrap">
-            {isArabicUI ? 'محرك لوحة مفاتيح iOS' : 'iOS Keyboard Layout Studio'}
+            {isArabicUI ? 'محرك لوحة مفاتيح iOS (ReactorKit)' : 'iOS Keyboard Studio (ReactorKit)'}
           </span>
         </div>
 
@@ -133,10 +115,10 @@ export default function App() {
             {isArabicUI ? 'المحاكي المباشر' : 'Live Simulator'}
           </span>
           <span className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap">
-            {isArabicUI ? 'بنية KeyboardLayoutEngine' : 'Layout Engine Architecture'}
+            {isArabicUI ? 'تدفق ReactorKit' : 'ReactorKit Stream'}
           </span>
           <span className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap">
-            {isArabicUI ? 'دعم العربية والإنجليزية' : 'Bilingual Keycaps'}
+            {isArabicUI ? 'بنية KeyboardLayoutEngine' : 'Layout Engine'}
           </span>
           <span className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap">
             {isArabicUI ? 'تصدير Swift' : 'Swift Export'}
@@ -150,7 +132,7 @@ export default function App() {
             type="button"
             onClick={() => setIsArabicUI(!isArabicUI)}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
-              isDark ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              reactorState.isDark ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
             }`}
             title="تبديل لغة الواجهة"
           >
@@ -161,13 +143,13 @@ export default function App() {
           {/* Theme Toggle */}
           <button
             type="button"
-            onClick={() => setIsDark(!isDark)}
+            onClick={toggleTheme}
             className={`p-2 rounded-lg border transition-colors ${
-              isDark ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-amber-300' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+              reactorState.isDark ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-amber-300' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
             }`}
-            title={isDark ? 'Light Mode' : 'Dark Mode'}
+            title={reactorState.isDark ? 'Light Mode' : 'Dark Mode'}
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {reactorState.isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Build APK GitHub Button */}
@@ -231,16 +213,16 @@ export default function App() {
 
           {/* iPhone Mockup Frame */}
           <IPhoneDeviceFrame
-            text={text}
-            cursorPosition={cursorPosition}
+            text={reactorState.text}
+            cursorPosition={reactorState.cursorPosition}
             onInsertText={handleInsertText}
             onBackspace={handleBackspace}
             onReturn={handleReturn}
             onMoveCursor={handleMoveCursor}
             onClearText={handleClearText}
-            isDark={isDark}
-            onToggleTheme={() => setIsDark(!isDark)}
-            customLayout={customLayout}
+            isDark={reactorState.isDark}
+            onToggleTheme={toggleTheme}
+            customLayout={reactorState.customLayout}
             isArabicUI={isArabicUI}
           />
 
@@ -253,8 +235,18 @@ export default function App() {
 
         {/* Right Column: Layout Engine Inspector & Control Deck */}
         <div className="w-full lg:w-96 flex flex-col gap-5">
+          {/* ReactorKit Unidirectional State Inspector */}
+          <ReactorKitInspector
+            history={reactorState.history}
+            currentMode={reactorState.mode}
+            shiftState={reactorState.shiftState}
+            language={reactorState.language}
+            onOpenSwiftModal={() => setIsSwiftModalOpen(true)}
+            isArabicUI={isArabicUI}
+          />
+
           {/* Layout Presets Card */}
-          <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm`}>
+          <div className={`p-5 rounded-2xl border ${reactorState.isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-blue-500" />
@@ -276,13 +268,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedPreset('en');
-                  setCustomLayout(null);
+                  keyboardReactor.action({ type: 'setCustomLayout', layout: null });
+                  keyboardReactor.action({ type: 'switchMode', mode: 'letters' });
+                  if (reactorState.language !== 'en') keyboardReactor.action({ type: 'switchLanguage' });
                 }}
                 className={`px-3 py-2.5 rounded-xl text-xs font-medium border text-left flex items-center justify-between transition-all ${
-                  selectedPreset === 'en' && !customLayout
+                  reactorState.mode === 'letters' && reactorState.language === 'en' && !reactorState.customLayout
                     ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
-                    : isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    : reactorState.isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <span>🇺🇸 English (US)</span>
@@ -292,13 +285,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedPreset('ar');
-                  setCustomLayout(null);
+                  keyboardReactor.action({ type: 'setCustomLayout', layout: null });
+                  keyboardReactor.action({ type: 'switchMode', mode: 'letters' });
+                  if (reactorState.language !== 'ar') keyboardReactor.action({ type: 'switchLanguage' });
                 }}
                 className={`px-3 py-2.5 rounded-xl text-xs font-medium border text-left flex items-center justify-between transition-all ${
-                  selectedPreset === 'ar' && !customLayout
+                  reactorState.mode === 'letters' && reactorState.language === 'ar' && !reactorState.customLayout
                     ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
-                    : isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    : reactorState.isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <span>🇸🇦 العربية</span>
@@ -308,13 +302,13 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedPreset('numbers');
-                  setCustomLayout(null);
+                  keyboardReactor.action({ type: 'setCustomLayout', layout: null });
+                  keyboardReactor.action({ type: 'switchMode', mode: 'numbers' });
                 }}
                 className={`px-3 py-2.5 rounded-xl text-xs font-medium border text-left flex items-center justify-between transition-all ${
-                  selectedPreset === 'numbers' && !customLayout
+                  reactorState.mode === 'numbers' && !reactorState.customLayout
                     ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
-                    : isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    : reactorState.isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <span>🔢 Numbers</span>
@@ -324,13 +318,13 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedPreset('symbols');
-                  setCustomLayout(null);
+                  keyboardReactor.action({ type: 'setCustomLayout', layout: null });
+                  keyboardReactor.action({ type: 'switchMode', mode: 'symbols' });
                 }}
                 className={`px-3 py-2.5 rounded-xl text-xs font-medium border text-left flex items-center justify-between transition-all ${
-                  selectedPreset === 'symbols' && !customLayout
+                  reactorState.mode === 'symbols' && !reactorState.customLayout
                     ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
-                    : isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    : reactorState.isDark ? 'border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <span>🔣 Symbols</span>
@@ -338,14 +332,14 @@ export default function App() {
               </button>
             </div>
 
-            {customLayout && (
+            {reactorState.customLayout && (
               <div className="mt-2.5 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs flex items-center justify-between">
                 <span className="text-blue-700 dark:text-blue-300 font-medium">
                   {isArabicUI ? 'تخطيط مخصص نشط' : 'Active Custom Layout'}
                 </span>
                 <button
                   type="button"
-                  onClick={() => setCustomLayout(null)}
+                  onClick={() => keyboardReactor.action({ type: 'setCustomLayout', layout: null })}
                   className="text-red-500 hover:underline text-[11px]"
                 >
                   {isArabicUI ? 'استعادة الافتراضي' : 'Reset'}
@@ -355,10 +349,10 @@ export default function App() {
           </div>
 
           {/* Sound & Haptic Synthesizer Controls */}
-          <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm`}>
+          <div className={`p-5 rounded-2xl border ${reactorState.isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                {soundEnabled ? (
+                {reactorState.soundEnabled ? (
                   <Volume2 className="w-4 h-4 text-emerald-500" />
                 ) : (
                   <VolumeX className="w-4 h-4 text-slate-400" />
@@ -371,12 +365,12 @@ export default function App() {
                 type="button"
                 onClick={toggleSound}
                 className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
-                  soundEnabled 
+                  reactorState.soundEnabled 
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                {soundEnabled ? (isArabicUI ? 'مفعّل' : 'Enabled') : (isArabicUI ? 'مكتوم' : 'Muted')}
+                {reactorState.soundEnabled ? (isArabicUI ? 'مفعّل' : 'Enabled') : (isArabicUI ? 'مكتوم' : 'Muted')}
               </button>
             </div>
 
@@ -393,18 +387,18 @@ export default function App() {
                 min="0"
                 max="1"
                 step="0.05"
-                value={soundVolume}
+                value={reactorState.soundVolume}
                 onChange={(e) => handleVolumeChange(Number(e.target.value))}
                 className="flex-1 accent-blue-600 cursor-pointer"
               />
               <span className="text-xs font-mono tabular-nums text-slate-400 w-8 text-right">
-                {Math.round(soundVolume * 100)}%
+                {Math.round(reactorState.soundVolume * 100)}%
               </span>
             </div>
           </div>
 
           {/* Engine Architecture & Metrics Card */}
-          <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm flex flex-col gap-3.5`}>
+          <div className={`p-5 rounded-2xl border ${reactorState.isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shadow-sm flex flex-col gap-3.5`}>
             <div className="flex items-center justify-between border-b pb-2.5 dark:border-slate-800">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 {isArabicUI ? 'مواصفات التخطيط' : 'KeyboardLayout Engine Specs'}
@@ -435,7 +429,7 @@ export default function App() {
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/50 dark:border-slate-800">
                 <span className="text-slate-400 block text-[10px] uppercase font-medium">Typed Characters</span>
                 <span className="text-base font-bold tabular-nums text-slate-800 dark:text-slate-200">
-                  {text.length}
+                  {reactorState.text.length}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/50 dark:border-slate-800">
@@ -513,7 +507,7 @@ export default function App() {
         initialLayout={activeLayoutData}
         isOpen={isEditorModalOpen}
         onClose={() => setIsEditorModalOpen(false)}
-        onSave={(newLayout) => setCustomLayout(newLayout)}
+        onSave={(newLayout) => keyboardReactor.action({ type: 'setCustomLayout', layout: newLayout })}
         isArabicUI={isArabicUI}
       />
 
