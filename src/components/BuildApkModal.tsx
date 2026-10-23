@@ -55,7 +55,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Setup Java JDK 17
         uses: actions/setup-java@v4
@@ -63,21 +62,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install NPM Dependencies
-        run: npm ci || npm install
+        run: |
+          npm install --legacy-peer-deps
+          npm install @capacitor/core@latest @capacitor/android@latest @capacitor/cli@latest --save-dev --legacy-peer-deps
 
       - name: Build Web Production Assets
         run: npm run build
 
-      - name: Install Capacitor CLI & Android
-        run: |
-          npm install -g @capacitor/cli @capacitor/core @capacitor/android
-          npm install @capacitor/core @capacitor/android --save-dev
-
-      - name: Add Android Native Project
+      - name: Configure Capacitor Android Project
         run: |
           npx cap add android || true
           npx cap sync android
@@ -86,7 +79,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
