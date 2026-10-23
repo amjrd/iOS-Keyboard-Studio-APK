@@ -1,0 +1,6 @@
+{
+  "name": "iOS Keyboard Layout Studio",
+  "description": "Professional iOS Keyboard simulator and custom Layout Engine based on Cem Olcay's KeyboardLayoutEngine architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,6 @@
+{
+  "appId": "com.ioskeyboard.engine",
+  "appName": "iOS Keyboard Studio",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
