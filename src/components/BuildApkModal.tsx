@@ -54,7 +54,7 @@ jobs:
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup Java JDK 17
         uses: actions/setup-java@v4
@@ -63,16 +63,16 @@ jobs:
           java-version: '17'
 
       - name: Install NPM Dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm install @capacitor/core@latest @capacitor/android@latest @capacitor/cli@latest --save-dev --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Build Web Production Assets
         run: npm run build
 
       - name: Configure Capacitor Android Project
         run: |
-          npx cap add android || true
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
           npx cap sync android
 
       - name: Build Debug APK via Gradle
